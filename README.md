@@ -1,6 +1,6 @@
 # Code-Review-Action
 
-An GPT Agent that reviews your code and pull requests as they come in! 
+A GPT Agent that reviews your code and pull requests as they come in! 
 
 ## Setup:
 
