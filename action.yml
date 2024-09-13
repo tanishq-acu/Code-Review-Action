@@ -1,7 +1,8 @@
 name: Process Changed Files on Pull Request
 description: Run GPT-Agent on files upon Pull-Request.
-Icon: activity
-Color: gray-dark
+branding:
+  icon: activity
+  color: gray-dark
 on:
   pull_request:
     types: [opened, synchronize, reopened]
