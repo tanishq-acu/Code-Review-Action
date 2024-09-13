@@ -1,0 +1,72 @@
+name: Process Changed Files on Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  pull-requests: write
+  contents: read
+jobs:
+  process_files:
+    runs-on: ubuntu-latest
+    container:
+      image: tanishqacu/code-reviews:pr
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        
+    - name: Create MetaGPT config file
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        METAGPT_DIR="$HOME/.metagpt"
+        mkdir -p "$METAGPT_DIR"
+        touch ~/.metagpt/config2.yaml
+        cat <<EOF > ~/.metagpt/config2.yaml
+        llm:
+          api_type: "openai"
+          model: "gpt-4o-mini"
+          pricing_plan: "gpt-4"
+          base_url: "https://api.openai.com/v1"
+          api_key: "$OPENAI_API_KEY" 
+        EOF
+    - name: Fetch base and head branches
+      run: |
+        git config --global --add safe.directory /__w/PR-Agent/PR-Agent
+        git fetch origin ${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}
+        git fetch origin ${{ github.event.pull_request.head.ref }}:refs/remotes/origin/${{ github.event.pull_request.head.ref }}
+
+    - name: Get diff and run script
+      id: run_script
+      run: |
+        cleaned_files=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }} origin/${{ github.event.pull_request.head.ref }})
+        result=$(echo "$cleaned_files" | xargs -I {} echo '"'{}'"' | xargs python .github/workflows/run_check.py)
+        result=$(cat feedback.txt)
+        result=$(echo "$result" | tr "\`" "'" | sed "s/\"/'/g")
+        {
+          echo "result<<EOF"
+          echo "$result"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+        
+
+    - name: Check output
+      if: ${{ steps.run_scipt.outputs.result == ' ' }}
+      run: exit 0
+      id: clean_output
+
+    - name: Post result as a comment
+      if: ${{ steps.run_script.outputs.result != ' ' }}
+      env:
+        result: ${{ steps.run_script.outputs.result }}
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `${{ env.result }}`
+          })
