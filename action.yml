@@ -1,5 +1,5 @@
 name: Process Changed Files on Pull Request
-
+description: Run GPT-Agent on files upon Pull-Request.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
